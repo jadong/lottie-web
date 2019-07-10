@@ -1,30 +1,32 @@
-(function addTextPropertyDecorator() {
+(function addDecorator() {
 
     function searchExpressions(){
         if(this.data.d.x){
-            this.comp = this.elem.comp;
-            if(this.getValue) {
-                this.getPreValue = this.getValue;
-            }
             this.calculateExpression = ExpressionManager.initiateExpression.bind(this)(this.elem,this.data.d,this);
-            this.getValue = this.getExpressionValue;
+            this.addEffect(this.getExpressionValue.bind(this));
             return true;
         }
-        return false;
+    }
+
+    TextProperty.prototype.getExpressionValue = function(currentValue, text) {
+        var newValue = this.calculateExpression(text);
+        if(currentValue.t !== newValue) {
+            var newData = {};
+            this.copyData(newData, currentValue);
+            newData.t = newValue.toString();
+            newData.__complete = false;
+            return newData;
+        }
+        return currentValue;
     }
 
     TextProperty.prototype.searchProperty = function(){
-        this.kf = this.searchExpressions() || this.data.d.k.length > 1;
-        return this.kf;
-    }
 
-    TextProperty.prototype.getExpressionValue = function(num){
-        this.calculateExpression();
-        if(this.mdf) {
-            this.currentData.t = this.v.toString();
-            this.completeTextData(this.currentData);
-        }
-    }
+        var isKeyframed = this.searchKeyframes();
+        var hasExpressions = this.searchExpressions();
+        this.kf = isKeyframed || hasExpressions;
+        return this.kf;
+    };
 
     TextProperty.prototype.searchExpressions = searchExpressions;
     

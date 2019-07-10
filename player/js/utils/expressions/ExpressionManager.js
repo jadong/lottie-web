@@ -1,43 +1,16 @@
 var ExpressionManager = (function(){
+    'use strict';
     var ob = {};
     var Math = BMMath;
     var window = null;
     var document = null;
 
-    function duplicatePropertyValue(value, mult){
-        mult = mult || 1;
-
-        if(typeof value === 'number'  || value instanceof Number){
-            return value*mult;
-        }else if(value.i){
-            return JSON.parse(JSON.stringify(value));
-        }else{
-            var arr = createTypedArray('int16', value.length);
-            var i, len = value.length;
-            for(i=0;i<len;i+=1){
-                arr[i]=value[i]*mult;
-            }
-            return arr;
-        }
-    }
-
-    function isTypeOfArray(arr) {
+    function $bm_isInstanceOfArray(arr) {
         return arr.constructor === Array || arr.constructor === Float32Array;
     }
 
-    function shapesEqual(shape1, shape2) {
-        if(shape1._length !== shape2._length || shape1.c !== shape2.c){
-            return false;
-        }
-        var i, len = shape1._length;
-        for(i = 0; i < len; i += 1) {
-            if(shape1.v[i][0] !== shape2.v[i][0] || shape1.v[i][1] !== shape2.v[i][1]
-                || shape1.o[i][0] !== shape2.o[i][0] || shape1.o[i][1] !== shape2.o[i][1]
-                || shape1.i[i][0] !== shape2.i[i][0] || shape1.i[i][1] !== shape2.i[i][1]){
-                return false;
-            }
-        }
-        return true;
+    function isNumerable(tOfV, v) {
+        return tOfV === 'number' || tOfV === 'boolean' || tOfV === 'string' || v instanceof Number;
     }
 
     function $bm_neg(a){
@@ -45,7 +18,7 @@ var ExpressionManager = (function(){
         if(tOfA === 'number' || tOfA === 'boolean'  || a instanceof Number ){
             return -a;
         }
-        if(isTypeOfArray(a)){
+        if($bm_isInstanceOfArray(a)){
             var i, lenA = a.length;
             var retArr = [];
             for(i=0;i<lenA;i+=1){
@@ -53,7 +26,14 @@ var ExpressionManager = (function(){
             }
             return retArr;
         }
+        if (a.propType) {
+            return a.v;
+        }
     }
+
+    var easeInBez = BezierFactory.getBezierEasing(0.333,0,.833,.833, 'easeIn').get;
+    var easeOutBez = BezierFactory.getBezierEasing(0.167,0.167,.667,1, 'easeOut').get;
+    var easeInOutBez = BezierFactory.getBezierEasing(.33,0,.667,1, 'easeInOut').get;
 
     function sum(a,b) {
         var tOfA = typeof a;
@@ -61,18 +41,20 @@ var ExpressionManager = (function(){
         if(tOfA === 'string' || tOfB === 'string'){
             return a + b;
         }
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string'  || b instanceof Number)) {
+        if(isNumerable(tOfA, a) && isNumerable(tOfB, b)) {
             return a + b;
         }
-        if(isTypeOfArray(a) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number )){
+        if($bm_isInstanceOfArray(a) && isNumerable(tOfB, b)){
+            a = a.slice(0);
             a[0] = a[0] + b;
             return a;
         }
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) && isTypeOfArray(b)){
+        if(isNumerable(tOfA, a) && $bm_isInstanceOfArray(b)){
+            b = b.slice(0);
             b[0] = a + b[0];
             return b;
         }
-        if(isTypeOfArray(a) && isTypeOfArray(b)){
+        if($bm_isInstanceOfArray(a) && $bm_isInstanceOfArray(b)){
             
             var i = 0, lenA = a.length, lenB = b.length;
             var retArr = [];
@@ -80,7 +62,7 @@ var ExpressionManager = (function(){
                 if((typeof a[i] === 'number' || a[i] instanceof Number) && (typeof b[i] === 'number' || b[i] instanceof Number)){
                     retArr[i] = a[i] + b[i];
                 }else{
-                    retArr[i] = b[i] == undefined ? a[i] : a[i] || b[i];
+                    retArr[i] = b[i] === undefined ? a[i] : a[i] || b[i];
                 }
                 i += 1;
             }
@@ -93,7 +75,7 @@ var ExpressionManager = (function(){
     function sub(a,b) {
         var tOfA = typeof a;
         var tOfB = typeof b;
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number )) {
+        if(isNumerable(tOfA, a) && isNumerable(tOfB, b)) {
             if(tOfA === 'string') {
                 a = parseInt(a);
             }
@@ -102,22 +84,24 @@ var ExpressionManager = (function(){
             }
             return a - b;
         }
-        if( isTypeOfArray(a) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number )){
+        if( $bm_isInstanceOfArray(a) && isNumerable(tOfB, b)){
+            a = a.slice(0);
             a[0] = a[0] - b;
             return a;
         }
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) &&  isTypeOfArray(b)){
+        if(isNumerable(tOfA, a) &&  $bm_isInstanceOfArray(b)){
+            b = b.slice(0);
             b[0] = a - b[0];
             return b;
         }
-        if(isTypeOfArray(a) && isTypeOfArray(b)){
+        if($bm_isInstanceOfArray(a) && $bm_isInstanceOfArray(b)){
             var i = 0, lenA = a.length, lenB = b.length;
             var retArr = [];
             while(i<lenA || i < lenB){
-                if((typeof a[i] === 'number' || a[i] instanceof Number) && typeof (typeof b[i] === 'number' || b[i] instanceof Number)){
+                if((typeof a[i] === 'number' || a[i] instanceof Number) && (typeof b[i] === 'number' || b[i] instanceof Number)){
                     retArr[i] = a[i] - b[i];
                 }else{
-                    retArr[i] = b[i] == undefined ? a[i] : a[i] || b[i];
+                    retArr[i] = b[i] === undefined ? a[i] : a[i] || b[i];
                 }
                 i += 1;
             }
@@ -130,12 +114,12 @@ var ExpressionManager = (function(){
         var tOfA = typeof a;
         var tOfB = typeof b;
         var arr;
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number )) {
+        if(isNumerable(tOfA, a) && isNumerable(tOfB, b)) {
             return a * b;
         }
 
         var i, len;
-        if(isTypeOfArray(a) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number )){
+        if($bm_isInstanceOfArray(a) && isNumerable(tOfB, b)){
             len = a.length;
             arr = createTypedArray('float32', len);
             for(i=0;i<len;i+=1){
@@ -143,7 +127,7 @@ var ExpressionManager = (function(){
             }
             return arr;
         }
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) && isTypeOfArray(b)){
+        if(isNumerable(tOfA, a) && $bm_isInstanceOfArray(b)){
             len = b.length;
             arr = createTypedArray('float32', len);
             for(i=0;i<len;i+=1){
@@ -158,11 +142,11 @@ var ExpressionManager = (function(){
         var tOfA = typeof a;
         var tOfB = typeof b;
         var arr;
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number )) {
+        if(isNumerable(tOfA, a) && isNumerable(tOfB, b)) {
             return a / b;
         }
         var i, len;
-        if(isTypeOfArray(a) && (tOfB === 'number' || tOfB === 'boolean' || tOfB === 'string' || b instanceof Number  )){
+        if($bm_isInstanceOfArray(a) && isNumerable(tOfB, b)){
             len = a.length;
             arr = createTypedArray('float32', len);
             for(i=0;i<len;i+=1){
@@ -170,7 +154,7 @@ var ExpressionManager = (function(){
             }
             return arr;
         }
-        if((tOfA === 'number' || tOfA === 'boolean' || tOfA === 'string' || a instanceof Number ) && isTypeOfArray(b)){
+        if(isNumerable(tOfA, a) && $bm_isInstanceOfArray(b)){
             len = b.length;
             arr = createTypedArray('float32', len);
             for(i=0;i<len;i+=1){
@@ -189,6 +173,11 @@ var ExpressionManager = (function(){
         }
         return a % b;
     }
+    var $bm_sum = sum;
+    var $bm_sub = sub;
+    var $bm_mul = mul;
+    var $bm_div = div;
+    var $bm_mod = mod;
 
     function clamp(num, min, max) {
         if(min > max){
@@ -211,27 +200,27 @@ var ExpressionManager = (function(){
 
     var helperLengthArray = [0,0,0,0,0,0];
 
-    function length(arr1,arr2){
-        if(typeof arr1 === 'number' || arr1 instanceof Number){
+    function length(arr1, arr2) {
+        if (typeof arr1 === 'number' || arr1 instanceof Number) {
             arr2 = arr2 || 0;
             return Math.abs(arr1 - arr2);
         }
-        if(!arr2){
+        if(!arr2) {
             arr2 = helperLengthArray;
         }
-        var i,len = Math.min(arr1.length,arr2.length);
+        var i, len = Math.min(arr1.length, arr2.length);
         var addedLength = 0;
-        for(i=0;i<len;i+=1){
-            addedLength += Math.pow(arr2[i]-arr1[i],2);
+        for (i = 0; i < len; i += 1) {
+            addedLength += Math.pow(arr2[i] - arr1[i], 2);
         }
         return Math.sqrt(addedLength);
     }
 
-    function normalize(vec){
+    function normalize(vec) {
         return div(vec, length(vec));
     }
 
-    function rgbToHsl(val){
+    function rgbToHsl(val) {
         var r = val[0]; var g = val[1]; var b = val[2];
         var max = Math.max(r, g, b), min = Math.min(r, g, b);
         var h, s, l = (max + min) / 2;
@@ -251,6 +240,16 @@ var ExpressionManager = (function(){
 
         return [h, s, l,val[3]];
     }
+
+    function hue2rgb(p, q, t){
+        if(t < 0) t += 1;
+        if(t > 1) t -= 1;
+        if(t < 1/6) return p + (q - p) * 6 * t;
+        if(t < 1/2) return q;
+        if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    }
+
     function hslToRgb(val){
         var h = val[0];
         var s = val[1];
@@ -258,17 +257,9 @@ var ExpressionManager = (function(){
 
         var r, g, b;
 
-        if(s == 0){
+        if(s === 0){
             r = g = b = l; // achromatic
         }else{
-            function hue2rgb(p, q, t){
-                if(t < 0) t += 1;
-                if(t > 1) t -= 1;
-                if(t < 1/6) return p + (q - p) * 6 * t;
-                if(t < 1/2) return q;
-                if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                return p;
-            }
 
             var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
             var p = 2 * l - q;
@@ -282,7 +273,15 @@ var ExpressionManager = (function(){
 
     function linear(t, tMin, tMax, value1, value2){
         if(value1 === undefined || value2 === undefined){
-            return linear(t,0,1,tMin,tMax);
+            value1 = tMin;
+            value2 = tMax;
+            tMin = 0;
+            tMax = 1;
+        }
+        if(tMax < tMin) {
+            var _tMin = tMax;
+            tMax = tMin;
+            tMin = _tMin;
         }
         if(t <= tMin) {
             return value1;
@@ -318,7 +317,7 @@ var ExpressionManager = (function(){
             var arr = createTypedArray('float32', len);
             var rnd = BMMath.random();
             for(i=0;i<len;i+=1){
-                arr[i] = min[i] + rnd*(max[i]-min[i])
+                arr[i] = min[i] + rnd*(max[i]-min[i]);
             }
             return arr;
         }
@@ -330,15 +329,16 @@ var ExpressionManager = (function(){
     }
 
     function createPath(points, inTangents, outTangents, closed) {
-        inTangents = inTangents && inTangents.length ? inTangents : points;
-        outTangents = outTangents && outTangents.length ? outTangents : points;
-        var path = shape_pool.newShape();
-        var len = points.length;
-        path.setPathData(closed, len);
+        var i, len = points.length;
+        var path = shape_pool.newElement();
+        path.setPathData(!!closed, len);
+        var arrPlaceholder = [0,0], inVertexPoint, outVertexPoint;
         for(i = 0; i < len; i += 1) {
-            path.setTripleAt(points[i][0],points[i][1],outTangents[i][0] + points[i][0],outTangents[i][1] + points[i][1],inTangents[i][0] + points[i][0],inTangents[i][1] + points[i][1],i,true)
+            inVertexPoint = (inTangents && inTangents[i]) ? inTangents[i] : arrPlaceholder;
+            outVertexPoint = (outTangents && outTangents[i]) ? outTangents[i] : arrPlaceholder;
+            path.setTripleAt(points[i][0],points[i][1],outVertexPoint[0] + points[i][0],outVertexPoint[1] + points[i][1],inVertexPoint[0] + points[i][0],inVertexPoint[1] + points[i][1],i,true);
         }
-        return path
+        return path;
     }
 
     function initiateExpression(elem,data,property){
@@ -346,23 +346,36 @@ var ExpressionManager = (function(){
         var needsVelocity = /velocity(?![\w\d])/.test(val);
         var _needsRandom = val.indexOf('random') !== -1;
         var elemType = elem.data.ty;
-        var transform,content,effect;
-        var thisComp = elem.comp;
+        var transform,$bm_transform,content,effect;
         var thisProperty = property;
+        thisProperty.valueAtTime = thisProperty.getValueAtTime;
+        Object.defineProperty(thisProperty, 'value', {
+            get: function() {
+                return thisProperty.v
+            }
+        })
         elem.comp.frameDuration = 1/elem.comp.globalData.frameRate;
+        elem.comp.displayStartTime = 0;
         var inPoint = elem.data.ip/elem.comp.globalData.frameRate;
         var outPoint = elem.data.op/elem.comp.globalData.frameRate;
         var width = elem.data.sw ? elem.data.sw : 0;
         var height = elem.data.sh ? elem.data.sh : 0;
-        var loopIn, loop_in, loopOut, loop_out;
-        var toWorld,fromWorld,fromComp,fromCompToSurface,anchorPoint,thisLayer,thisComp,mask,valueAtTime,velocityAtTime;
-        var fn = new Function();
-        //var fnStr = 'var fn = function(){'+val+';this.v = $bm_rt;}';
-        //eval(fnStr);
+        var name = elem.data.nm;
+        var loopIn, loop_in, loopOut, loop_out, smooth;
+        var toWorld,fromWorld,fromComp,toComp,fromCompToSurface, position, rotation, anchorPoint, scale, thisLayer, thisComp,mask,valueAtTime,velocityAtTime;
+        var __expression_functions = [];
+        if(data.xf) {
+            var i, len = data.xf.length;
+            for(i = 0; i < len; i += 1) {
+                __expression_functions[i] = eval('(function(){ return ' + data.xf[i] + '}())');
+            }
+        }
 
-        var fn = eval('[function(){' + val+';if($bm_rt.__shapeObject){this.v=shape_pool.clone($bm_rt.v);}else{this.v=$bm_rt;}}' + ']')[0];
-        var bindedFn = fn.bind(this);
+        var scoped_bm_rt;
+        var expression_function = eval('[function _expression_function(){' + val+';scoped_bm_rt=$bm_rt}' + ']')[0];
         var numKeys = property.kf ? data.k.length : 0;
+
+        var active = !this.data || this.data.hd !== true;
 
         var wiggle = function wiggle(freq,amp){
             var i,j, len = this.pv.length ? this.pv.length : 1;
@@ -405,13 +418,17 @@ var ExpressionManager = (function(){
             loop_out = loopOut;
         }
 
-        var loopInDuration = function loopInDuration(type,duration){
-            return loopIn(type,duration,true);
-        }.bind(this);
+        if(thisProperty.smooth) {
+            smooth = thisProperty.smooth.bind(thisProperty);
+        }
 
-        var loopOutDuration = function loopOutDuration(type,duration){
+        function loopInDuration(type,duration){
+            return loopIn(type,duration,true);
+        }
+
+        function loopOutDuration(type,duration){
             return loopOut(type,duration,true);
-        }.bind(this);
+        }
 
         if(this.getValueAtTime) {
             valueAtTime = this.getValueAtTime.bind(this);
@@ -428,27 +445,40 @@ var ExpressionManager = (function(){
             var pitch = Math.atan2(fVec[0],Math.sqrt(fVec[1]*fVec[1]+fVec[2]*fVec[2]))/degToRads;
             var yaw = -Math.atan2(fVec[1],fVec[2])/degToRads;
             return [yaw,pitch,0];
-        };
+        }
 
         function easeOut(t, tMin, tMax, val1, val2){
-            if(val1 === undefined){
-                val1 = tMin;
-                val2 = tMax;
-            } else {
-                t = (t - tMin) / (tMax - tMin);
-            }
-            return -(val2-val1) * t*(t-2) + val1;
-        };
+            return applyEase(easeOutBez, t, tMin, tMax, val1, val2);
+        }
 
         function easeIn(t, tMin, tMax, val1, val2){
+            return applyEase(easeInBez, t, tMin, tMax, val1, val2);
+        }
+
+        function ease(t, tMin, tMax, val1, val2){
+            return applyEase(easeInOutBez, t, tMin, tMax, val1, val2);
+        }
+
+        function applyEase(fn, t, tMin, tMax, val1, val2) {
             if(val1 === undefined){
                 val1 = tMin;
                 val2 = tMax;
             } else {
                 t = (t - tMin) / (tMax - tMin);
             }
-            return (val2-val1)*t*t + val1;
-        };
+            t = t > 1 ? 1 : t < 0 ? 0 : t;
+            var mult = fn(t);
+            if($bm_isInstanceOfArray(val1)) {
+                var i, len = val1.length;
+                var arr = createTypedArray('float32', len);
+                for (i = 0; i < len; i += 1) {
+                    arr[i] = (val2[i] - val1[i]) * mult + val1[i];
+                }
+                return arr;
+            } else {
+                return (val2 - val1) * mult + val1;
+            }
+        }
 
         function nearestKey(time){
             var i, len = data.k.length,index,keyTime;
@@ -489,7 +519,7 @@ var ExpressionManager = (function(){
             ob.index = index;
             ob.time = keyTime/elem.comp.globalData.frameRate;
             return ob;
-        };
+        }
 
         function key(ind){
             var ob, i, len;
@@ -498,145 +528,133 @@ var ExpressionManager = (function(){
             }
             ind -= 1;
             ob = {
-                time: data.k[ind].t/elem.comp.globalData.frameRate
+                time: data.k[ind].t/elem.comp.globalData.frameRate,
+                value: []
             };
-            var arr;
-            if(ind === data.k.length - 1 && !data.k[ind].h){
-                arr = data.k[ind-1].e;
-            }else{
-                arr = data.k[ind].s;
-            }
+            var arr = data.k[ind].hasOwnProperty('s') ? data.k[ind].s : data.k[ind - 1].e;
+
             len = arr.length;
             for(i=0;i<len;i+=1){
                 ob[i] = arr[i];
+                ob.value[i] = arr[i]
             }
             return ob;
-        };
+        }
 
-        function framesToTime(frames,fps){
-            if(!fps){
+        function framesToTime(frames, fps) { 
+            if (!fps) {
                 fps = elem.comp.globalData.frameRate;
             }
-            return frames/fps;
-        };
+            return frames / fps;
+        }
 
-        function timeToFrames(t,fps){
-            if(!t && t !== 0){
+        function timeToFrames(t, fps) {
+            if (!t && t !== 0) {
                 t = time;
             }
-            if(!fps){
+            if (!fps) {
                 fps = elem.comp.globalData.frameRate;
             }
-            return t*fps;
-        };
+            return t * fps;
+        }
 
         function seedRandom(seed){
             BMMath.seedrandom(randSeed + seed);
-        };
+        }
 
         function sourceRectAtTime() {
             return elem.sourceRectAtTime();
         }
 
-        var time,velocity, value,textIndex,textTotal,selectorValue;
+        function substring(init, end) {
+            if(typeof value === 'string') {
+                if(end === undefined) {
+                return value.substring(init)
+                }
+                return value.substring(init, end)
+            }
+            return '';
+        }
+
+        function substr(init, end) {
+            if(typeof value === 'string') {
+                if(end === undefined) {
+                return value.substr(init)
+                }
+                return value.substr(init, end)
+            }
+            return '';
+        }
+
+        var time, velocity, value, text, textIndex, textTotal, selectorValue;
         var index = elem.data.ind;
         var hasParent = !!(elem.hierarchy && elem.hierarchy.length);
         var parent;
         var randSeed = Math.floor(Math.random()*1000000);
-        function executeExpression(){
-            if(_needsRandom){
+        var globalData = elem.globalData;
+        function executeExpression(_value) {
+            // globalData.pushExpression();
+            value = _value;
+            if (_needsRandom) {
                 seedRandom(randSeed);
             }
-            if(this.frameExpressionId === elem.globalData.frameId && this.type !== 'textSelector'){
-                return;
+            if (this.frameExpressionId === elem.globalData.frameId && this.propType !== 'textSelector') {
+                return value;
             }
-            if(this.lock){
-                this.v = duplicatePropertyValue(this.pv,this.mult);
-                return true;
-            }
-            if(this.type === 'textSelector'){
+            if(this.propType === 'textSelector'){
                 textIndex = this.textIndex;
                 textTotal = this.textTotal;
                 selectorValue = this.selectorValue;
             }
-            if(!thisLayer){
+            if (!thisLayer) {
+                text = elem.layerInterface.text;
                 thisLayer = elem.layerInterface;
                 thisComp = elem.comp.compInterface;
                 toWorld = thisLayer.toWorld.bind(thisLayer);
                 fromWorld = thisLayer.fromWorld.bind(thisLayer);
                 fromComp = thisLayer.fromComp.bind(thisLayer);
-                mask = thisLayer.mask ? thisLayer.mask.bind(thisLayer):null;
+                toComp = thisLayer.toComp.bind(thisLayer);
+                mask = thisLayer.mask ? thisLayer.mask.bind(thisLayer) : null;
                 fromCompToSurface = fromComp;
             }
-            if(!transform){
+            if (!transform) {
                 transform = elem.layerInterface("ADBE Transform Group");
-                anchorPoint = transform.anchorPoint;
+                $bm_transform = transform;
+                if(transform) {
+                    anchorPoint = transform.anchorPoint;
+                    /*position = transform.position;
+                    rotation = transform.rotation;
+                    scale = transform.scale;*/
+                }
             }
             
-            if(elemType === 4 && !content){
+            if (elemType === 4 && !content) {
                 content = thisLayer("ADBE Root Vectors Group");
             }
-            if(!effect){
+            if (!effect) {
                 effect = thisLayer(4);
             }
             hasParent = !!(elem.hierarchy && elem.hierarchy.length);
-            if(hasParent && !parent){
+            if (hasParent && !parent) {
                 parent = elem.hierarchy[0].layerInterface;
             }
-            this.lock = true;
-            if(this.getPreValue){
-                this.getPreValue();
-            }
-            value = this.pv;
             time = this.comp.renderedFrame/this.comp.globalData.frameRate;
-            if(needsVelocity){
+            if (needsVelocity) {
                 velocity = velocityAtTime(time);
             }
-            bindedFn();
+            expression_function();
             this.frameExpressionId = elem.globalData.frameId;
-            var i,len;
-            if(this.mult){
-                if(typeof this.v === 'number' || this.v instanceof Number || this.v instanceof String || typeof this.v === 'string'){
-                    this.v *= this.mult;
-                }else if(this.v.length === 1){
-                    this.v = this.v[0] * this.mult;
-                }else{
-                    len = this.v.length;
-                    if(value === this.v){
-                        this.v = len === 2 ? [value[0],value[1]] : [value[0],value[1],value[2]];
-                    }
-                    for(i = 0; i < len; i += 1){
-                        this.v[i] *= this.mult;
-                    }
-                }
+
+
+            //TODO: Check if it's possible to return on ShapeInterface the .v value
+            if (scoped_bm_rt.propType === "shape") {
+                scoped_bm_rt = scoped_bm_rt.v;
             }
-            if(this.v.length === 1){
-                this.v = this.v[0];
-            }
-            if(typeof this.v === 'number' || this.v instanceof Number || this.v instanceof String || typeof this.v === 'string'){
-                if(this.lastValue !== this.v){
-                    this.lastValue = this.v;
-                    this.mdf = true;
-                }
-            }else if( this.v._length){
-                if(!shapesEqual(this.v,this.localShapeCollection.shapes[0])){
-                    this.mdf = true;
-                    this.localShapeCollection.releaseShapes();
-                    this.localShapeCollection.addShape(shape_pool.clone(this.v));
-                }
-            }else{
-                len = this.v.length;
-                for(i = 0; i < len; i += 1){
-                    if(this.v[i] !== this.lastValue[i]){
-                        this.lastValue[i] = this.v[i];
-                        this.mdf = true;
-                    }
-                }
-            }
-            this.lock = false;
+            // globalData.popExpression();
+            return scoped_bm_rt;
         }
         return executeExpression;
-    };
+    }
 
     ob.initiateExpression = initiateExpression;
     return ob;

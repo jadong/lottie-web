@@ -24,9 +24,13 @@ var createTypedArray = (function(){
 			return new Uint8ClampedArray(len);
 		}
 	}
-	if(typeof Float32Array === 'function') {
-		return createTypedArray
+	if(typeof Uint8ClampedArray === 'function' && typeof Float32Array === 'function') {
+		return createTypedArray;
 	} else {
-		return createRegularArray
+		return createRegularArray;
 	}
-}())
+}());
+
+function createSizedArray(len) {
+	return Array.apply(null,{length:len});
+}

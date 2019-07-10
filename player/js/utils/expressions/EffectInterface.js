@@ -4,24 +4,24 @@ var EffectsExpressionInterface = (function (){
     };
 
     function createEffectsInterface(elem, propertyGroup){
-        if(elem.effects){
+        if(elem.effectsManager){
 
             var effectElements = [];
             var effectsData = elem.data.ef;
-            var i, len = elem.effects.effectElements.length;
+            var i, len = elem.effectsManager.effectElements.length;
             for(i=0;i<len;i+=1){
-                effectElements.push(createGroupInterface(effectsData[i],elem.effects.effectElements[i],propertyGroup,elem));
+                effectElements.push(createGroupInterface(effectsData[i],elem.effectsManager.effectElements[i],propertyGroup,elem));
             }
 
             return function(name){
-                var effects = elem.data.ef, i = 0, len = effects.length;
+                var effects = elem.data.ef || [], i = 0, len = effects.length;
                 while(i<len) {
                     if(name === effects[i].nm || name === effects[i].mn || name === effects[i].ix){
                         return effectElements[i];
                     }
                     i += 1;
                 }
-            }
+            };
         }
     }
 
@@ -57,7 +57,7 @@ var EffectsExpressionInterface = (function (){
                 i += 1;
             }
             return effectElements[0]();
-        }
+        };
 
         groupInterface.propertyGroup = _propertyGroup;
 
@@ -73,16 +73,17 @@ var EffectsExpressionInterface = (function (){
                 return data.np;
             }
         });
-        groupInterface.active = data.en !== 0;
-        return groupInterface
+        groupInterface.active = groupInterface.enabled = data.en !== 0;
+        return groupInterface;
     }
 
     function createValueInterface(element, type, elem, propertyGroup){
+        var expressionProperty = ExpressionPropertyInterface(element.p);
         function interfaceFunction(){
             if(type === 10){
                 return elem.comp.compInterface(element.p.v);
             }
-            return ExpressionValue(element.p);
+            return expressionProperty();
         }
 
         if(element.p.setGroupProperty) {

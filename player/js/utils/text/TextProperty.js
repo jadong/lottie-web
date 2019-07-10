@@ -1,16 +1,20 @@
-function TextProperty(elem, data, dynamicProperties){
-	this._frameId = -99999;
+function TextProperty(elem, data){
+	this._frameId = initialDefaultFrame;
 	this.pv = '';
 	this.v = '';
 	this.kf = false;
-	this.firstFrame = true;
-	this.mdf = true;
-	this.data = data;
+	this._isFirstFrame = true;
+	this._mdf = false;
+    this.data = data;
 	this.elem = elem;
-	this.keysIndex = -1;
+    this.comp = this.elem.comp;
+	this.keysIndex = 0;
+    this.canResize = false;
+    this.minimumFontSize = 1;
+    this.effectsSequence = [];
 	this.currentData = {
 		ascent: 0,
-        boxWidth: [0,0],
+        boxWidth: this.defaultBoxWidth,
         f: '',
         fStyle: '',
         fWeight: '',
@@ -28,80 +32,135 @@ function TextProperty(elem, data, dynamicProperties){
         t: 0,
         tr: 0,
         sz:0,
-        ps:[0,0],
+        ps:null,
         fillColorAnim: false,
         strokeColorAnim: false,
         strokeWidthAnim: false,
         yOffset: 0,
+        finalSize:0,
+        finalText:[],
+        finalLineHeight: 0,
         __complete: false
 
-	}
-	if(this.searchProperty()) {
-		dynamicProperties.push(this);
-	} else {
-		this.getValue(true);
-	}
+	};
+    this.copyData(this.currentData, this.data.d.k[0].s);
+
+    if(!this.searchProperty()) {
+        this.completeTextData(this.currentData);
+    }
+}
+
+TextProperty.prototype.defaultBoxWidth = [0,0];
+
+TextProperty.prototype.copyData = function(obj, data) {
+    for(var s in data) {
+        if(data.hasOwnProperty(s)) {
+            obj[s] = data[s];
+        }
+    }
+    return obj;
 }
 
 TextProperty.prototype.setCurrentData = function(data){
-		var currentData = this.currentData;
-        currentData.ascent = data.ascent;
-        currentData.boxWidth = data.boxWidth ? data.boxWidth : currentData.boxWidth;
-        currentData.f = data.f;
-        currentData.fStyle = data.fStyle;
-        currentData.fWeight = data.fWeight;
-        currentData.fc = data.fc;
-        currentData.j = data.j;
-        currentData.justifyOffset = data.justifyOffset;
-        currentData.l = data.l;
-        currentData.lh = data.lh;
-        currentData.lineWidths = data.lineWidths;
-        currentData.ls = data.ls;
-        currentData.of = data.of;
-        currentData.s = data.s;
-        currentData.sc = data.sc;
-        currentData.sw = data.sw;
-        currentData.sz = data.sz;
-        currentData.ps = data.ps;
-        currentData.t = data.t;
-        currentData.tr = data.tr;
-        currentData.fillColorAnim = data.fillColorAnim || currentData.fillColorAnim;
-        currentData.strokeColorAnim = data.strokeColorAnim || currentData.strokeColorAnim;
-        currentData.strokeWidthAnim = data.strokeWidthAnim || currentData.strokeWidthAnim;
-        currentData.yOffset = data.yOffset;
-        currentData.__complete = false;
-}
+    if(!data.__complete) {
+        this.completeTextData(data);
+    }
+    this.currentData = data;
+    this.currentData.boxWidth = this.currentData.boxWidth || this.defaultBoxWidth;
+    this._mdf = true;
+};
 
 TextProperty.prototype.searchProperty = function() {
-	this.kf = this.data.d.k.length > 1;
-	return this.kf;
+    return this.searchKeyframes();
+};
+
+TextProperty.prototype.searchKeyframes = function() {
+    this.kf = this.data.d.k.length > 1;
+    if(this.kf) {
+        this.addEffect(this.getKeyframeValue.bind(this));
+    }
+    return this.kf;
 }
 
-TextProperty.prototype.getValue = function() {
-	this.mdf = false;
-	var frameId = this.elem.globalData.frameId;
-	if((frameId === this._frameId || !this.kf) && !this.firstFrame) {
-		return;
-	}
-	var textKeys = this.data.d.k, textDocumentData;
+TextProperty.prototype.addEffect = function(effectFunction) {
+	this.effectsSequence.push(effectFunction);
+    this.elem.addDynamicProperty(this);
+};
+
+TextProperty.prototype.getValue = function(_finalValue) {
+    if((this.elem.globalData.frameId === this.frameId || !this.effectsSequence.length) && !_finalValue) {
+        return;
+    }
+    this.currentData.t = this.data.d.k[this.keysIndex].s.t;
+    var currentValue = this.currentData;
+    var currentIndex = this.keysIndex;
+    if(this.lock) {
+        this.setCurrentData(this.currentData);
+        return;
+    }
+    this.lock = true;
+    this._mdf = false;
+    var multipliedValue;
+    var i, len = this.effectsSequence.length;
+    var finalValue = _finalValue || this.data.d.k[this.keysIndex].s;
+    for(i = 0; i < len; i += 1) {
+        //Checking if index changed to prevent creating a new object every time the expression updates.
+        if(currentIndex !== this.keysIndex) {
+            finalValue = this.effectsSequence[i](finalValue, finalValue.t);
+        } else {
+            finalValue = this.effectsSequence[i](this.currentData, finalValue.t);
+        }
+    }
+    if(currentValue !== finalValue) {
+        this.setCurrentData(finalValue);
+    }
+    this.pv = this.v = this.currentData;
+    this.lock = false;
+    this.frameId = this.elem.globalData.frameId;
+}
+
+TextProperty.prototype.getKeyframeValue = function() {
+    var textKeys = this.data.d.k, textDocumentData;
+    var frameNum = this.elem.comp.renderedFrame;
     var i = 0, len = textKeys.length;
     while(i <= len - 1) {
         textDocumentData = textKeys[i].s;
-        if(i === len - 1 || textKeys[i+1].t > frameId){
+        if(i === len - 1 || textKeys[i+1].t > frameNum){
             break;
         }
         i += 1;
     }
     if(this.keysIndex !== i) {
-    	if(!textDocumentData.__complete) {
-            this.completeTextData(textDocumentData);
-        }
-        this.setCurrentData(textDocumentData);
-        this.mdf = this.firstFrame ? false : true;
-        this.pv = this.v = this.currentData.t;
         this.keysIndex = i;
     }
-	this._frameId = frameId;
+    return this.data.d.k[this.keysIndex].s;
+};
+
+TextProperty.prototype.buildFinalText = function(text) {
+    var combinedCharacters = FontManager.getCombinedCharacterCodes();
+    var charactersArray = [];
+    var i = 0, len = text.length;
+    var charCode;
+    while (i < len) {
+        charCode = text.charCodeAt(i);
+        if (combinedCharacters.indexOf(charCode) !== -1) {
+            charactersArray[charactersArray.length - 1] += text.charAt(i);
+        } else {
+            if (charCode >= 0xD800 && charCode <= 0xDBFF) {
+                charCode = text.charCodeAt(i + 1);
+                if (charCode >= 0xDC00 && charCode <= 0xDFFF) {
+                    charactersArray.push(text.substr(i, 2));
+                    ++i;
+                } else {
+                    charactersArray.push(text.charAt(i));
+                }
+            } else {
+                charactersArray.push(text.charAt(i));
+            }
+        }
+        i += 1;
+    }
+    return charactersArray;
 }
 
 TextProperty.prototype.completeTextData = function(documentData) {
@@ -118,7 +177,7 @@ TextProperty.prototype.completeTextData = function(documentData) {
     var j, jLen;
     var fontData = fontManager.getFontByName(documentData.f);
     var charData, cLength = 0;
-    var styles = fontData.fStyle.split(' ');
+    var styles = fontData.fStyle ? fontData.fStyle.split(' ') : [];
 
     var fWeight = 'normal', fStyle = 'normal';
     len = styles.length;
@@ -141,49 +200,77 @@ TextProperty.prototype.completeTextData = function(documentData) {
             case 'regular':
             case 'normal':
             fWeight = '400';
+            break;
             case 'light':
             case 'thin':
             fWeight = '200';
             break;
         }
     }
-    documentData.fWeight = fWeight;
+    documentData.fWeight = fontData.fWeight || fWeight;
     documentData.fStyle = fStyle;
-    len = documentData.t.length;
-    var trackingOffset = documentData.tr/1000*documentData.s;
+    documentData.finalSize = documentData.s;
+    documentData.finalText = this.buildFinalText(documentData.t);
+    len = documentData.finalText.length;
+    documentData.finalLineHeight = documentData.lh;
+    var trackingOffset = documentData.tr/1000*documentData.finalSize;
+    var charCode;
     if(documentData.sz){
+        var flag = true;
         var boxWidth = documentData.sz[0];
-        var lastSpaceIndex = -1;
-        for(i=0;i<len;i+=1){
-            newLineFlag = false;
-            if(documentData.t.charAt(i) === ' '){
-                lastSpaceIndex = i;
-            }else if(documentData.t.charCodeAt(i) === 13){
-                lineWidth = 0;
-                newLineFlag = true;
-            }
-            if(fontManager.chars){
-                charData = fontManager.getCharData(documentData.t.charAt(i), fontData.fStyle, fontData.fFamily);
-                cLength = newLineFlag ? 0 : charData.w*documentData.s/100;
-            }else{
-                //tCanvasHelper.font = documentData.s + 'px '+ fontData.fFamily;
-                cLength = fontManager.measureText(documentData.t.charAt(i), documentData.f, documentData.s);
-            }
-            if(lineWidth + cLength > boxWidth && documentData.t.charAt(i) !== ' '){
-                if(lastSpaceIndex === -1){
-                    len += 1;
-                } else {
-                    i = lastSpaceIndex;
+        var boxHeight = documentData.sz[1];
+        var currentHeight, finalText;
+        while(flag) {
+            finalText = this.buildFinalText(documentData.t);
+            currentHeight = 0;
+            lineWidth = 0;
+            len = finalText.length;
+            trackingOffset = documentData.tr/1000*documentData.finalSize;
+            var lastSpaceIndex = -1;
+            for(i=0;i<len;i+=1){
+                charCode = finalText[i].charCodeAt(0);
+                newLineFlag = false;
+                if(finalText[i] === ' '){
+                    lastSpaceIndex = i;
+                }else if(charCode === 13 || charCode === 3){
+                    lineWidth = 0;
+                    newLineFlag = true;
+                    currentHeight += documentData.finalLineHeight || documentData.finalSize*1.2;
                 }
-                documentData.t = documentData.t.substr(0,i) + "\r" + documentData.t.substr(i === lastSpaceIndex ? i + 1 : i);
-                lastSpaceIndex = -1;
-                lineWidth = 0;
-            }else {
-                lineWidth += cLength;
-                lineWidth += trackingOffset;
+                if(fontManager.chars){
+                    charData = fontManager.getCharData(finalText[i], fontData.fStyle, fontData.fFamily);
+                    cLength = newLineFlag ? 0 : charData.w*documentData.finalSize/100;
+                }else{
+                    //tCanvasHelper.font = documentData.s + 'px '+ fontData.fFamily;
+                    cLength = fontManager.measureText(finalText[i], documentData.f, documentData.finalSize);
+                }
+                if(lineWidth + cLength > boxWidth && finalText[i] !== ' '){
+                    if(lastSpaceIndex === -1){
+                        len += 1;
+                    } else {
+                        i = lastSpaceIndex;
+                    }
+                    currentHeight += documentData.finalLineHeight || documentData.finalSize*1.2;
+                    finalText.splice(i, lastSpaceIndex === i ? 1 : 0,"\r");
+                    //finalText = finalText.substr(0,i) + "\r" + finalText.substr(i === lastSpaceIndex ? i + 1 : i);
+                    lastSpaceIndex = -1;
+                    lineWidth = 0;
+                }else {
+                    lineWidth += cLength;
+                    lineWidth += trackingOffset;
+                }
+            }
+            currentHeight += fontData.ascent*documentData.finalSize/100;
+            if(this.canResize && documentData.finalSize > this.minimumFontSize && boxHeight < currentHeight) {
+                documentData.finalSize -= 1;
+                documentData.finalLineHeight = documentData.finalSize * documentData.lh / documentData.s;
+            } else {
+                documentData.finalText = finalText;
+                len = documentData.finalText.length;
+                flag = false;
             }
         }
-        len = documentData.t.length;
+
     }
     lineWidth = - trackingOffset;
     cLength = 0;
@@ -191,10 +278,11 @@ TextProperty.prototype.completeTextData = function(documentData) {
     var currentChar;
     for (i = 0;i < len ;i += 1) {
         newLineFlag = false;
-        currentChar = documentData.t.charAt(i);
-        if(currentChar === ' '){
+        currentChar = documentData.finalText[i];
+        charCode = currentChar.charCodeAt(0);
+        if (currentChar === ' '){
             val = '\u00A0';
-        }else if(currentChar.charCodeAt(0) === 13){
+        } else if (charCode === 13 || charCode === 3) {
             uncollapsedSpaces = 0;
             lineWidths.push(lineWidth);
             maxLineWidth = lineWidth > maxLineWidth ? lineWidth : maxLineWidth;
@@ -203,15 +291,15 @@ TextProperty.prototype.completeTextData = function(documentData) {
             newLineFlag = true;
             currentLine += 1;
         }else{
-            val = documentData.t.charAt(i);
+            val = documentData.finalText[i];
         }
         if(fontManager.chars){
             charData = fontManager.getCharData(currentChar, fontData.fStyle, fontManager.getFontByName(documentData.f).fFamily);
-            cLength = newLineFlag ? 0 : charData.w*documentData.s/100;
+            cLength = newLineFlag ? 0 : charData.w*documentData.finalSize/100;
         }else{
-            //var charWidth = fontManager.measureText(val, documentData.f, documentData.s);
-            //tCanvasHelper.font = documentData.s + 'px '+ fontManager.getFontByName(documentData.f).fFamily;
-            cLength = fontManager.measureText(val, documentData.f, documentData.s);
+            //var charWidth = fontManager.measureText(val, documentData.f, documentData.finalSize);
+            //tCanvasHelper.font = documentData.finalSize + 'px '+ fontManager.getFontByName(documentData.f).fFamily;
+            cLength = fontManager.measureText(val, documentData.f, documentData.finalSize);
         }
 
         //
@@ -221,11 +309,11 @@ TextProperty.prototype.completeTextData = function(documentData) {
             lineWidth += cLength + trackingOffset + uncollapsedSpaces;
             uncollapsedSpaces = 0;
         }
-        letters.push({l:cLength,an:cLength,add:currentSize,n:newLineFlag, anIndexes:[], val: val, line: currentLine});
+        letters.push({l:cLength,an:cLength,add:currentSize,n:newLineFlag, anIndexes:[], val: val, line: currentLine, animatorJustifyOffset: 0});
         if(anchorGrouping == 2){
             currentSize += cLength;
-            if(val == '' || val == '\u00A0' || i == len - 1){
-                if(val == '' || val == '\u00A0'){
+            if(val === '' || val === '\u00A0' || i === len - 1){
+                if(val === '' || val === '\u00A0'){
                     currentSize -= cLength;
                 }
                 while(currentPos<=i){
@@ -239,8 +327,8 @@ TextProperty.prototype.completeTextData = function(documentData) {
             }
         }else if(anchorGrouping == 3){
             currentSize += cLength;
-            if(val == '' || i == len - 1){
-                if(val == ''){
+            if(val === '' || i === len - 1){
+                if(val === ''){
                     currentSize -= cLength;
                 }
                 while(currentPos<=i){
@@ -298,7 +386,7 @@ TextProperty.prototype.completeTextData = function(documentData) {
         for(i=0;i<len;i+=1){
             letterData = letters[i];
             letterData.anIndexes[j] = ind;
-            if((based == 1 && letterData.val != '') || (based == 2 && letterData.val != '' && letterData.val != '\u00A0') || (based == 3 && (letterData.n || letterData.val == '\u00A0' || i == len - 1)) || (based == 4 && (letterData.n || i == len - 1))){
+            if((based == 1 && letterData.val !== '') || (based == 2 && letterData.val !== '' && letterData.val !== '\u00A0') || (based == 3 && (letterData.n || letterData.val == '\u00A0' || i == len - 1)) || (based == 4 && (letterData.n || i == len - 1))){
                 if(animatorData.s.rn === 1){
                     indexes.push(ind);
                 }
@@ -318,17 +406,36 @@ TextProperty.prototype.completeTextData = function(documentData) {
             }
         }
     }
-    documentData.yOffset = documentData.lh || documentData.s*1.2;
+    documentData.yOffset = documentData.finalLineHeight || documentData.finalSize*1.2;
     documentData.ls = documentData.ls || 0;
-    documentData.ascent = fontData.ascent*documentData.s/100;
-}
+    documentData.ascent = fontData.ascent*documentData.finalSize/100;
+};
 
 TextProperty.prototype.updateDocumentData = function(newData, index) {
 	index = index === undefined ? this.keysIndex : index;
+    var dData = this.copyData({}, this.data.d.k[index].s);
+    dData = this.copyData(dData, newData);
+    this.data.d.k[index].s = dData;
+    this.recalculate(index);
+    this.elem.addDynamicProperty(this);
+};
+
+TextProperty.prototype.recalculate = function(index) {
     var dData = this.data.d.k[index].s;
     dData.__complete = false;
-    dData.t = newData.t;
-    this.keysIndex = -1;
-    this.firstFrame = true;
-    this.getValue();
+    this.keysIndex = 0;
+    this._isFirstFrame = true;
+    this.getValue(dData);
 }
+
+TextProperty.prototype.canResizeFont = function(_canResize) {
+    this.canResize = _canResize;
+    this.recalculate(this.keysIndex);
+    this.elem.addDynamicProperty(this);
+};
+
+TextProperty.prototype.setMinimumFontSize = function(_fontValue) {
+    this.minimumFontSize = Math.floor(_fontValue) || 1;
+    this.recalculate(this.keysIndex);
+    this.elem.addDynamicProperty(this);
+};

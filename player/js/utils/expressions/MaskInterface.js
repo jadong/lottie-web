@@ -6,17 +6,25 @@ var MaskManagerInterface = (function(){
 	}
 	Object.defineProperty(MaskInterface.prototype, 'maskPath', {
         get: function(){
-                if(this._mask.prop.k){
-                    this._mask.prop.getValue();
-                }
-                return this._mask.prop;
+            if(this._mask.prop.k){
+                this._mask.prop.getValue();
             }
-        });
+            return this._mask.prop;
+        }
+    });
+	Object.defineProperty(MaskInterface.prototype, 'maskOpacity', {
+        get: function(){
+            if(this._mask.op.k){
+                this._mask.op.getValue();
+            }
+            return this._mask.op.v * 100;
+        }
+    });
 
 	var MaskManager = function(maskManager, elem){
 		var _maskManager = maskManager;
 		var _elem = elem;
-		var _masksInterfaces = Array.apply(null,{length: maskManager.viewData.length});
+		var _masksInterfaces = createSizedArray(maskManager.viewData.length);
 		var i, len = maskManager.viewData.length;
 		for(i = 0; i < len; i += 1) {
 			_masksInterfaces[i] = new MaskInterface(maskManager.viewData[i], maskManager.masksProperties[i]);
@@ -30,9 +38,8 @@ var MaskManagerInterface = (function(){
 		        }
 		        i += 1;
 		    }
-		}
-		return maskFunction
-	}
-	return MaskManager
-}())
-
+		};
+		return maskFunction;
+	};
+	return MaskManager;
+}());

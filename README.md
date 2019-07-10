@@ -1,4 +1,4 @@
-# Lottie for Web, [Android](https://github.com/airbnb/lottie-android), [iOS](https://github.com/airbnb/lottie-ios), and [React Native](https://github.com/airbnb/lottie-react-native)
+# Lottie for Web, [Android](https://github.com/airbnb/lottie-android), [iOS](https://github.com/airbnb/lottie-ios), [React Native](https://github.com/airbnb/lottie-react-native), and [Windows](https://aka.ms/lottie)
 
 Lottie is a mobile library for Web,  and iOS that parses [Adobe After Effects](http://www.adobe.com/products/aftereffects.html) animations exported as json with [Bodymovin](https://github.com/airbnb/lottie-web) and renders them natively on mobile!
 
@@ -45,29 +45,37 @@ CC 2014 and up.
 
 ### Option 4:
 - Close After Effects<br/>
-- Extract the zipped file on build/extension/bodymovin.zxp to the adobe CEP folder:<br/>
+- Extract the zipped file on `build/extension/bodymovin.zxp` to the adobe CEP folder:<br/>
 WINDOWS:<br/>
-C:\Program Files (x86)\Common Files\Adobe\CEP\extensions or<br/>
-C:\<username>\AppData\Roaming\Adobe\CEP\extensions<br/>
+`C:\Program Files (x86)\Common Files\Adobe\CEP\extensions or`<br/>
+`C:\<username>\AppData\Roaming\Adobe\CEP\extensions`<br/>
 MAC:<br/>
-/Library/Application\ Support/Adobe/CEP/extensions/bodymovin<br/>
+`/Library/Application\ Support/Adobe/CEP/extensions/bodymovin`<br/>
 (you can open the terminal and type:<br/>
-cp -R YOURUNZIPEDFOLDERPATH/extension /Library/Application\ Support/Adobe/CEP/extensions/bodymovin<br/>
+`$ cp -R YOURUNZIPEDFOLDERPATH/extension /Library/Application\ Support/Adobe/CEP/extensions/bodymovin`<br/>
 then type:<br/>
-ls /Library/Application\ Support/Adobe/CEP/extensions/bodymovin<br/>
+`$ ls /Library/Application\ Support/Adobe/CEP/extensions/bodymovin`<br/>
 to make sure it was copied correctly type)<br/>
 
 - Edit the registry key:<br/>
 WINDOWS:<br/>
-open the registry key HKEY_CURRENT_USER/Software/Adobe/CSXS.6 and add a key named PlayerDebugMode, of type String, and value 1.<br/>
+open the registry key `HKEY_CURRENT_USER/Software/Adobe/CSXS.6` and add a key named `PlayerDebugMode`, of type String, and value `1`.<br/>
 MAC:<br/>
-open the file ~/Library/Preferences/com.adobe.CSXS.6.plist and add a row with key PlayerDebugMode, of type String, and value 1.<br/>
+open the file `~/Library/Preferences/com.adobe.CSXS.6.plist` and add a row with key `PlayerDebugMode`, of type String, and value `1`.<br/>
 
 ### Option 5:
 
 Install the zxp manually following the instructions here:
 https://helpx.adobe.com/x-productkb/global/installingextensionsandaddons.html
 Skip directly to "Install third-party extensions"
+
+### Option 6:
+
+Install with [Homebrew](http://brew.sh)-[adobe](https://github.com/danielbayley/homebrew-adobe):
+```bash
+brew tap danielbayley/adobe
+brew cask install lottie
+```
 
 ### After installing
 - **Windows:** Go to Edit > Preferences > General > and check on "Allow Scripts to Write Files and Access Network"
@@ -76,7 +84,7 @@ Skip directly to "Install third-party extensions"
 # HTML player installation
 ```bash
 # with npm
-npm install bodymovin
+npm install lottie-web
 
 # with bower
 bower install bodymovin
@@ -102,12 +110,12 @@ Or get it directly from the AE plugin clicking on Get Player
 - look for the exported json file (if you had images or AI layers on your animation, there will be an images folder with the exported files)
 
 ### HTML
-- get the bodymovin.js file from the build/player/ folder for the latest build
+- get the lottie.js file from the build/player/ folder for the latest build
 - include the .js file on your html (remember to gzip it for production)
 ```html
-<script src="js/bodymovin.js" type="text/javascript"></script>
+<script src="js/lottie.js" type="text/javascript"></script>
 ```
-You can call bodymovin.loadAnimation() to start an animation.
+You can call lottie.loadAnimation() to start an animation.
 It takes an object as a unique param with:
 - animationData: an Object with the exported animation data.
 - path: the relative path to the animation object. (animationData and path are mutually exclusive)
@@ -121,7 +129,7 @@ It takes an object as a unique param with:
 It returns the animation instance you can control with play, pause, setSpeed, etc.
 
 ```js
-bodymovin.loadAnimation({
+lottie.loadAnimation({
   container: element, // the dom element that will contain the animation
   renderer: 'svg',
   loop: true,
@@ -132,7 +140,7 @@ bodymovin.loadAnimation({
 
 #### Composition Settings:
 Check this wiki page for an explanation for each setting.
-https://github.com/bodymovin/bodymovin/wiki/Composition-Settings
+https://github.com/airbnb/lottie-web/wiki/Composition-Settings
 
 ## Usage
 Animation instances have these main methods:
@@ -176,22 +184,25 @@ Animation instances have these main methods:
 ***
 ### destroy()
 ***
-
-### Aditional methods:
-- updateTextDocumentData -- updates a text layer's data
-[More Info](https://github.com/bodymovin/bodymovin/wiki/TextLayer.updateDocumentData)
+### getDuration(inFrames)
+- `inFrames`:  If true, returns duration in frames, if false, in seconds.
 ***
 
-### bodymovin has 8 global methods that will affect all animations:
-**bodymovin.play()** -- with 1 optional parameter **name** to target a specific animation <br/>
-**bodymovin.stop()** -- with 1 optional parameter **name** to target a specific animation <br/>
-**bodymovin.setSpeed()** -- first argument speed (1 is normal speed) -- with 1 optional parameter **name** to target a specific animation <br/>
-**bodymovin.setDirection()** -- first argument direction (1 is normal direction.) -- with 1 optional parameter **name** to target a specific animation <br/>
-**bodymovin.searchAnimations()** -- looks for elements with class "bodymovin" <br/>
-**bodymovin.loadAnimation()** -- Explained above. returns an animation instance to control individually. <br/>
-**bodymovin.destroy()** -- To destroy and release resources. The DOM element will be emptied.<br />
-**bodymovin.registerAnimation()** -- you can register an element directly with registerAnimation. It must have the "data-animation-path" attribute pointing at the data.json url<br />
-**bodymovin.setQuality()** -- default 'high', set 'high','medium','low', or a number > 1 to improve player performance. In some animations as low as 2 won't show any difference.<br />
+### Additional methods:
+- updateTextDocumentData -- updates a text layer's data
+[More Info](https://github.com/airbnb/lottie-web/wiki/TextLayer.updateDocumentData)
+***
+
+### Lottie has 8 global methods that will affect all animations:
+**lottie.play()** -- with 1 optional parameter **name** to target a specific animation <br/>
+**lottie.stop()** -- with 1 optional parameter **name** to target a specific animation <br/>
+**lottie.setSpeed()** -- first argument speed (1 is normal speed) -- with 1 optional parameter **name** to target a specific animation <br/>
+**lottie.setDirection()** -- first argument direction (1 is normal direction.) -- with 1 optional parameter **name** to target a specific animation <br/>
+**lottie.searchAnimations()** -- looks for elements with class "lottie" or "bodymovin" <br/>
+**lottie.loadAnimation()** -- Explained above. returns an animation instance to control individually. <br/>
+**lottie.destroy()** -- To destroy and release resources. The DOM element will be emptied.<br />
+**lottie.registerAnimation()** -- you can register an element directly with registerAnimation. It must have the "data-animation-path" attribute pointing at the data.json url<br />
+**lottie.setQuality()** -- default 'high', set 'high','medium','low', or a number > 1 to improve player performance. In some animations as low as 2 won't show any difference.<br />
 
 ## Events
 - onComplete
@@ -206,14 +217,15 @@ you can also use addEventListener with the following events:
 - segmentStart
 - config_ready (when initial config is done)
 - data_ready (when all parts of the animation have been loaded)
+- data_failed (when part of the animation can not be loaded)
 - loaded_images (when all image loads have either succeeded or errored)
 - DOMLoaded (when elements have been added to the DOM)
 - destroy
 
 #### Other loading options
-- if you want to use an existing canvas to draw, you can pass an extra object: 'renderer' with the following configuration:
+- if you want to use an existing canvas to draw, you can pass an extra object: 'rendererSettings' with the following configuration:
 ```js
-bodymovin.loadAnimation({
+lottie.loadAnimation({
   container: element, // the dom element
   renderer: 'svg',
   loop: true,
@@ -232,29 +244,24 @@ bodymovin.loadAnimation({
 Doing this you will have to handle the canvas clearing after each frame
 <br/>
 Another way to load animations is adding specific attributes to a dom element.
-You have to include a div and set it's class to bodymovin.
-If you do it before page load, it will automatically search for all tags with the class "bodymovin".
-Or you can call bodymovin.searchAnimations() after page load and it will search all elements with the class "bodymovin".
+You have to include a div and set it's class to "lottie".
+If you do it before page load, it will automatically search for all tags with the class "lottie".
+Or you can call `lottie.searchAnimations()` after page load and it will search all elements with the class "lottie".
 <br/>
-- add the data.json to a folder relative to the html
-- create a div that will contain the animation.
-<br/>
- **Required**
- <br/>
- . a class called "bodymovin"
- . a "data-animation-path" attribute with relative path to the data.json
- <br/>
-**Optional**
-<br/>
- . a "data-anim-loop" attribute
- . a "data-name" attribute to specify a name to target play controls specifically
- <br/>
- **Example**
- <br/>
+- Add the data.json to a folder relative to the html
+- Create a div that will contain the animation.
+- **Required**
+  - A class called "lottie"
+  - A "data-animation-path" attribute with relative path to the data.json
+- **Optional**
+  - A "data-anim-loop" attribute
+  - A "data-name" attribute to specify a name to target play controls specifically
+
+**Example**
+
 ```html
- <div style="width:1067px;height:600px" class="bodymovin" data-animation-path="animation/" data-anim-loop="true" data-name="ninja"></div>
+ <div style="width:1067px;height:600px"  class="lottie" data-animation-path="animation/" data-anim-loop="true" data-name="ninja"></div>
 ```
-<br/>
 
 
 
@@ -265,7 +272,7 @@ You can preview or take an svg snapshot of the animation to use as poster. After
 
 ### Files
 If you have any images or AI layers that you haven't converted to shapes (I recommend that you convert them, so they get exported as vectors, right click each layer and do: "Create shapes from Vector Layers"), they will be saved to an images folder relative to the destination json folder.
-Beware not to overwrite an exiting folder on that same location.
+Beware not to overwrite an existing folder on that same location.
 
 
 ### Performance

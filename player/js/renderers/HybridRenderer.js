@@ -2,11 +2,15 @@ function HybridRenderer(animationItem, config){
     this.animationItem = animationItem;
     this.layers = null;
     this.renderedFrame = -1;
-    this.globalData = {
-        frameNum: -1
-    };
     this.renderConfig = {
-        className: (config && config.className) || ''
+        className: (config && config.className) || '',
+        imagePreserveAspectRatio: (config && config.imagePreserveAspectRatio) || 'xMidYMid slice',
+        hideOnTransparent: (config && config.hideOnTransparent === false) ? false : true
+    };
+    this.globalData = {
+        _mdf: false,
+        frameNum: -1,
+        renderConfig: this.renderConfig
     };
     this.pendingElements = [];
     this.elements = [];
@@ -14,10 +18,11 @@ function HybridRenderer(animationItem, config){
     this.destroyed = false;
     this.camera = null;
     this.supports3d = true;
+    this.rendererType = 'html';
 
 }
 
-extendPrototype(BaseRenderer,HybridRenderer);
+extendPrototype([BaseRenderer],HybridRenderer);
 
 HybridRenderer.prototype.buildItem = SVGRenderer.prototype.buildItem;
 
@@ -35,74 +40,77 @@ HybridRenderer.prototype.appendElementInPos = function(element, pos){
     }
     var layer = this.layers[pos];
     if(!layer.ddd || !this.supports3d){
-        var i = 0;
-        var nextDOMElement, nextLayer;
-        while(i<pos){
-            if(this.elements[i] && this.elements[i]!== true && this.elements[i].getBaseElement){
-                nextLayer = this.elements[i];
-                nextDOMElement = this.layers[i].ddd ? this.getThreeDContainerByPos(i) : nextLayer.getBaseElement();
-            }
-            i += 1;
-        }
-        if(nextDOMElement){
-            if(!layer.ddd || !this.supports3d){
-                this.layerElement.insertBefore(newDOMElement, nextDOMElement);
-            }
+        if(this.threeDElements) {
+            this.addTo3dContainer(newDOMElement,pos);
         } else {
-            if(!layer.ddd || !this.supports3d){
-                this.layerElement.appendChild(newDOMElement);
+            var i = 0;
+            var nextDOMElement, nextLayer, tmpDOMElement;
+            while(i<pos){
+                if(this.elements[i] && this.elements[i]!== true && this.elements[i].getBaseElement){
+                    nextLayer = this.elements[i];
+                    tmpDOMElement = this.layers[i].ddd ? this.getThreeDContainerByPos(i) : nextLayer.getBaseElement();
+                    nextDOMElement = tmpDOMElement || nextDOMElement;
+                }
+                i += 1;
+            }
+            if(nextDOMElement){
+                if(!layer.ddd || !this.supports3d){
+                    this.layerElement.insertBefore(newDOMElement, nextDOMElement);
+                }
+            } else {
+                if(!layer.ddd || !this.supports3d){
+                    this.layerElement.appendChild(newDOMElement);
+                }
             }
         }
+        
     } else {
         this.addTo3dContainer(newDOMElement,pos);
     }
 };
 
-
-HybridRenderer.prototype.createBase = function (data) {
-    return new SVGBaseElement(data, this.layerElement,this.globalData,this);
-};
-
 HybridRenderer.prototype.createShape = function (data) {
     if(!this.supports3d){
-        return new IShapeElement(data, this.layerElement,this.globalData,this);
+        return new SVGShapeElement(data, this.globalData, this);
     }
-    return new HShapeElement(data, this.layerElement,this.globalData,this);
+    return new HShapeElement(data, this.globalData, this);
 };
 
 HybridRenderer.prototype.createText = function (data) {
     if(!this.supports3d){
-        return new SVGTextElement(data, this.layerElement,this.globalData,this);
+        return new SVGTextElement(data, this.globalData, this);
     }
-    return new HTextElement(data, this.layerElement,this.globalData,this);
+    return new HTextElement(data, this.globalData, this);
 };
 
 HybridRenderer.prototype.createCamera = function (data) {
-    this.camera = new HCameraElement(data, this.layerElement,this.globalData,this);
+    this.camera = new HCameraElement(data, this.globalData, this);
     return this.camera;
 };
 
 HybridRenderer.prototype.createImage = function (data) {
     if(!this.supports3d){
-        return new IImageElement(data, this.layerElement,this.globalData,this);
+        return new IImageElement(data, this.globalData, this);
     }
-    return new HImageElement(data, this.layerElement,this.globalData,this);
+    return new HImageElement(data, this.globalData, this);
 };
 
 HybridRenderer.prototype.createComp = function (data) {
     if(!this.supports3d){
-        return new ICompElement(data, this.layerElement,this.globalData,this);
+        return new SVGCompElement(data, this.globalData, this);
     }
-    return new HCompElement(data, this.layerElement,this.globalData,this);
+    return new HCompElement(data, this.globalData, this);
 
 };
 
 HybridRenderer.prototype.createSolid = function (data) {
     if(!this.supports3d){
-        return new ISolidElement(data, this.layerElement,this.globalData,this);
+        return new ISolidElement(data, this.globalData, this);
     }
-    return new HSolidElement(data, this.layerElement,this.globalData,this);
+    return new HSolidElement(data, this.globalData, this);
 };
+
+HybridRenderer.prototype.createNull = SVGRenderer.prototype.createNull;
 
 HybridRenderer.prototype.getThreeDContainerByPos = function(pos){
     var i = 0, len = this.threeDElements.length;
@@ -112,24 +120,28 @@ HybridRenderer.prototype.getThreeDContainerByPos = function(pos){
         }
         i += 1;
     }
-}
+};
 
-HybridRenderer.prototype.createThreeDContainer = function(pos){
-    var perspectiveElem = document.createElement('div');
+HybridRenderer.prototype.createThreeDContainer = function(pos, type){
+    var perspectiveElem = createTag('div');
     styleDiv(perspectiveElem);
-    perspectiveElem.style.width = this.globalData.compSize.w+'px';
-    perspectiveElem.style.height = this.globalData.compSize.h+'px';
-    perspectiveElem.style.transformOrigin = perspectiveElem.style.mozTransformOrigin = perspectiveElem.style.webkitTransformOrigin = "50% 50%";
-    var container = document.createElement('div');
+    var container = createTag('div');
     styleDiv(container);
-    container.style.transform = container.style.webkitTransform = 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)';
+    if(type === '3d') {
+        perspectiveElem.style.width = this.globalData.compSize.w+'px';
+        perspectiveElem.style.height = this.globalData.compSize.h+'px';
+        perspectiveElem.style.transformOrigin = perspectiveElem.style.mozTransformOrigin = perspectiveElem.style.webkitTransformOrigin = "50% 50%";
+        container.style.transform = container.style.webkitTransform = 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)';
+    }
+    
     perspectiveElem.appendChild(container);
-    this.resizerElem.appendChild(perspectiveElem);
+    //this.resizerElem.appendChild(perspectiveElem);
     var threeDContainerData = {
         container:container,
         perspectiveElem:perspectiveElem,
         startPos: pos,
-        endPos: pos
+        endPos: pos,
+        type: type
     };
     this.threeDElements.push(threeDContainerData);
     return threeDContainerData;
@@ -138,15 +150,25 @@ HybridRenderer.prototype.createThreeDContainer = function(pos){
 HybridRenderer.prototype.build3dContainers = function(){
     var i, len = this.layers.length;
     var lastThreeDContainerData;
+    var currentContainer = '';
     for(i=0;i<len;i+=1){
-        if(this.layers[i].ddd){
-            if(!lastThreeDContainerData){
-                lastThreeDContainerData = this.createThreeDContainer(i);
+        if(this.layers[i].ddd && this.layers[i].ty !== 3){
+            if(currentContainer !== '3d'){
+                currentContainer = '3d';
+                lastThreeDContainerData = this.createThreeDContainer(i,'3d');
             }
             lastThreeDContainerData.endPos = Math.max(lastThreeDContainerData.endPos,i);
         } else {
-            lastThreeDContainerData = null;
+            if(currentContainer !== '2d'){
+                currentContainer = '2d';
+                lastThreeDContainerData = this.createThreeDContainer(i,'2d');
+            }
+            lastThreeDContainerData.endPos = Math.max(lastThreeDContainerData.endPos,i);
         }
+    }
+    len = this.threeDElements.length;
+    for(i = len - 1; i >= 0; i --) {
+        this.resizerElem.appendChild(this.threeDElements[i].perspectiveElem);
     }
 };
 
@@ -174,7 +196,7 @@ HybridRenderer.prototype.addTo3dContainer = function(elem,pos){
 };
 
 HybridRenderer.prototype.configAnimation = function(animData){
-    var resizerElem = document.createElement('div');
+    var resizerElem = createTag('div');
     var wrapper = this.animationItem.wrapper;
     resizerElem.style.width = animData.w+'px';
     resizerElem.style.height = animData.h+'px';
@@ -182,7 +204,7 @@ HybridRenderer.prototype.configAnimation = function(animData){
     styleDiv(resizerElem);
     resizerElem.style.transformStyle = resizerElem.style.webkitTransformStyle = resizerElem.style.mozTransformStyle = "flat";
     if(this.renderConfig.className) {
-      wrapper.setAttribute('class', this.renderConfig.className);
+      resizerElem.setAttribute('class', this.renderConfig.className);
     }
     wrapper.appendChild(resizerElem);
 
@@ -194,22 +216,11 @@ HybridRenderer.prototype.configAnimation = function(animData){
     this.resizerElem.appendChild(svg);
     var defs = createNS('defs');
     svg.appendChild(defs);
-    this.globalData.defs = defs;
     this.data = animData;
     //Mask animation
-    this.globalData.getAssetData = this.animationItem.getAssetData.bind(this.animationItem);
-    this.globalData.getAssetsPath = this.animationItem.getAssetsPath.bind(this.animationItem);
-    this.globalData.elementLoaded = this.animationItem.elementLoaded.bind(this.animationItem);
-    this.globalData.frameId = 0;
-    this.globalData.compSize = {
-        w: animData.w,
-        h: animData.h
-    };
-    this.globalData.frameRate = animData.fr;
+    this.setupGlobalData(animData, svg);
+    this.globalData.defs = defs;
     this.layers = animData.layers;
-    this.globalData.fontManager = new FontManager();
-    this.globalData.fontManager.addChars(animData.chars);
-    this.globalData.fontManager.addFonts(animData.fonts,svg);
     this.layerElement = this.resizerElem;
     this.build3dContainers();
     this.updateContainerSize();
@@ -274,7 +285,7 @@ HybridRenderer.prototype.initItems = function(){
 
 HybridRenderer.prototype.searchExtraCompositions = function(assets){
     var i, len = assets.length;
-    var floatingContainer = document.createElement('div');
+    var floatingContainer = createTag('div');
     for(i=0;i<len;i+=1){
         if(assets[i].xt){
             var comp = this.createComp(assets[i],floatingContainer,this.globalData.comp,null);

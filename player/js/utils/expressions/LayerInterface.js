@@ -55,10 +55,14 @@ var LayerExpressionInterface = (function (){
         return toWorldMat.inversePoint(arr);
     }
 
+    function sampleImage() {
+        return [1,1,1,1];
+    }
+
 
     return function(elem){
 
-        var transformInterface = TransformExpressionInterface(elem.transform);
+        var transformInterface;
 
         function _registerMaskInterface(maskManager){
             _thisLayerFunction.mask = new MaskManagerInterface(maskManager, elem);
@@ -81,6 +85,8 @@ var LayerExpressionInterface = (function (){
                     return transformInterface;
                 case 4:
                 case "ADBE Effect Parade":
+                case "effects":
+                case "Effects":
                     return _thisLayerFunction.effect;
             }
         }
@@ -88,35 +94,37 @@ var LayerExpressionInterface = (function (){
         _thisLayerFunction.fromWorld = fromWorld;
         _thisLayerFunction.toComp = toWorld;
         _thisLayerFunction.fromComp = fromComp;
+        _thisLayerFunction.sampleImage = sampleImage;
         _thisLayerFunction.sourceRectAtTime = elem.sourceRectAtTime.bind(elem);
         _thisLayerFunction._elem = elem;
-        Object.defineProperty(_thisLayerFunction, 'hasParent', {
-            get: function(){
-                return !!elem.hierarchy;
-            }
-        });
-        Object.defineProperty(_thisLayerFunction, 'parent', {
-            get: function(){
-                return elem.hierarchy[0].layerInterface;
-            }
-        });
-        Object.defineProperty(_thisLayerFunction, "rotation", getDescriptor(transformInterface, 'rotation'));
-        Object.defineProperty(_thisLayerFunction, "scale", getDescriptor(transformInterface, 'scale'));
-        Object.defineProperty(_thisLayerFunction, "position", getDescriptor(transformInterface, 'position'));
-        Object.defineProperty(_thisLayerFunction, "opacity", getDescriptor(transformInterface, 'opacity'));
-        Object.defineProperty(_thisLayerFunction, "anchorPoint", getDescriptor(transformInterface, 'anchorPoint'));
-
-        Object.defineProperty(_thisLayerFunction, "transform", {
-            get: function () {
-                return transformInterface;
-            }
-        });
-
-        Object.defineProperty(_thisLayerFunction, "_name", { value:elem.data.nm });
-
-        Object.defineProperty(_thisLayerFunction, "active", {
-            get: function(){
-                return elem.isVisible;
+        transformInterface = TransformExpressionInterface(elem.finalTransform.mProp);
+        var anchorPointDescriptor = getDescriptor(transformInterface, 'anchorPoint');
+        Object.defineProperties(_thisLayerFunction,{
+            hasParent: {
+                get: function(){
+                    return elem.hierarchy.length;
+                }
+            },
+            parent: {
+                get: function(){
+                    return elem.hierarchy[0].layerInterface;
+                }
+            },
+            rotation: getDescriptor(transformInterface, 'rotation'),
+            scale: getDescriptor(transformInterface, 'scale'),
+            position: getDescriptor(transformInterface, 'position'),
+            opacity: getDescriptor(transformInterface, 'opacity'),
+            anchorPoint: anchorPointDescriptor,
+            anchor_point: anchorPointDescriptor,
+            transform: {
+                get: function () {
+                    return transformInterface;
+                }
+            },
+            active: {
+                get: function(){
+                    return elem.isInRange;
+                }
             }
         });
 
@@ -125,9 +133,12 @@ var LayerExpressionInterface = (function (){
         _thisLayerFunction.source = elem.data.refId;
         _thisLayerFunction.height = elem.data.ty === 0 ? elem.data.h : 100;
         _thisLayerFunction.width = elem.data.ty === 0 ? elem.data.w : 100;
+        _thisLayerFunction.inPoint = elem.data.ip/elem.comp.globalData.frameRate;
+        _thisLayerFunction.outPoint = elem.data.op/elem.comp.globalData.frameRate;
+        _thisLayerFunction._name = elem.data.nm;
 
         _thisLayerFunction.registerMaskInterface = _registerMaskInterface;
         _thisLayerFunction.registerEffectsInterface = _registerEffectsInterface;
         return _thisLayerFunction;
-    }
+    };
 }());
